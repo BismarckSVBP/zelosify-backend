@@ -1,0 +1,123 @@
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String       @id @default(uuid())
+  username        String?      @unique
+  email           String
+  firstName       String?
+  lastName        String?
+  phoneNumber     String?
+  department      String?
+  role            Role
+  tenantId        String?
+  externalId      String?      @unique
+  totpSecret      String?
+  profileComplete Boolean      @default(false)
+  provider        AuthProvider @default(KEYCLOAK)
+  creator         String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  // Add the new optional token fields:
+  accessToken  String?
+  refreshToken String?
+
+  // Relation to tenant
+  tenant Tenants? @relation(fields: [tenantId], references: [tenantId])
+
+  @@unique([email, provider])
+  @@index([tenantId])
+}
+
+model Tenants {
+  tenantId    String   @id @default(uuid())
+  companyName String   @default("DemoTenant")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users    User[]
+  openings Opening[]//extra
+}
+
+model Opening {
+  id                     String        @id @default(uuid())
+  tenantId               String
+  title                  String
+  description            String?
+  location               String?
+  contractType           String?
+  hiringManagerId        String
+  experienceMin          Int
+  experienceMax          Int?
+  postedDate             DateTime      @default(now())
+  expectedCompletionDate DateTime?
+  actionDate             DateTime?
+  status                 OpeningStatus @default(OPEN)
+
+  // Relations
+  tenant         Tenants         @relation(fields: [tenantId], references: [tenantId])
+  hiringProfiles hiringProfile[]
+
+  @@index([tenantId])
+}
+
+model hiringProfile {
+  id                   Int           @id @default(autoincrement())
+  openingId            String
+  s3Key                String        @unique
+  uploadedBy           String
+  submittedAt          DateTime      @default(now())
+  status               ProfileStatus @default(SUBMITTED)
+  shortlistedBy        String?
+  shortlistedAt        DateTime?
+  rejectedBy           String?
+  rejectedAt           DateTime?
+  recommended          Boolean       @default(false)
+  recommendationReason String?
+  isDeleted            Boolean       @default(false)
+  isDraft              Boolean       @default(false)
+
+  // Relation
+  opening Opening @relation(fields: [openingId], references: [id])
+
+  @@index([openingId])
+}
+
+enum AuthProvider {
+  KEYCLOAK
+  GOOGLE
+  MICROSOFT
+}
+
+enum Role {
+  ADMIN
+  BUSINESS_APPROVER
+  BUSINESS_USER
+  FINANCE_MANAGER
+  HIRING_MANAGER
+  IT_VENDOR
+  PROCUREMENT_MANAGER
+  RESOURCE_MANAGER
+  VENDOR_MANAGER
+}
+
+enum OpeningStatus {
+  OPEN
+  CLOSED
+  ON_HOLD
+}
+
+enum ProfileStatus {
+  SUBMITTED
+  SHORTLISTED
+  REJECTED
+}
